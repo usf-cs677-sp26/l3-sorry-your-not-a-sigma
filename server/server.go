@@ -13,6 +13,8 @@ import (
 
 func handleStorage(msgHandler *messages.MessageHandler, request *messages.StorageRequest) {
 	log.Println("Attempting to store", request.FileName)
+	// os.O_EXCL ensure no overwrite
+	// SPEC: 1. Make sure the file doesn’t already exist (refuse to overwrite existing files)
 	file, err := os.OpenFile(request.FileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Println(err)
@@ -74,6 +76,7 @@ func handleClient(msgHandler *messages.MessageHandler) {
 		}
 
 		// TODO close here or in handleStorage??
+		// spec says "Disconnect the client" after succesful store and retrieve
 		switch msg := wrapper.Msg.(type) {
 		case *messages.Wrapper_StorageReq:
 			handleStorage(msgHandler, msg.StorageReq)
@@ -99,6 +102,7 @@ func main() {
 	}
 
 	port := os.Args[1]
+	// SPEC: 2. Listen on the specified port for incoming client connections
 	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		log.Fatalln(err.Error())
@@ -111,7 +115,7 @@ func main() {
 		dir = os.Args[2]
 	}
 
-	// Start up and make sure storage directory exists
+	// SPEC: 1. Start up and make sure storage directory exists
 	if err := os.Chdir(dir); err != nil {
 		log.Fatalln(err)
 	}
@@ -123,7 +127,7 @@ func main() {
 		if conn, err := listener.Accept(); err == nil {
 			log.Println("Accepted connection", conn.RemoteAddr())
 			handler := messages.NewMessageHandler(conn)
-			// Handle each request with a separate goroutine (to allow multiple client connections)
+			// SPEC: 3. Handle each request with a separate goroutine (to allow multiple client connections)
 			go handleClient(handler)
 		}
 	}
