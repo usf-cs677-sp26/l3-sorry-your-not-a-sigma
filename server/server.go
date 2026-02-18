@@ -73,13 +73,16 @@ func handleClient(msgHandler *messages.MessageHandler) {
 			log.Println(err)
 		}
 
+		// TODO close here or in handleStorage??
 		switch msg := wrapper.Msg.(type) {
 		case *messages.Wrapper_StorageReq:
 			handleStorage(msgHandler, msg.StorageReq)
-			continue
+			msgHandler.Close()
+			return
 		case *messages.Wrapper_RetrievalReq:
 			handleRetrieval(msgHandler, msg.RetrievalReq)
-			continue
+			msgHandler.Close()
+			return
 		case nil:
 			log.Println("Received an empty message, terminating client")
 			return
