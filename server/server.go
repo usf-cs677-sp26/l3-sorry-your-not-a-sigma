@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/md5"
+	"github.com/shirou/gopsutil/v4/disk"
 	"file-transfer/messages"
 	"file-transfer/util"
 	"fmt"
@@ -19,6 +20,24 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 	if err != nil {
 		log.Println(err)
 		msgHandler.SendResponse(false, err.Error())
+		msgHandler.Close()
+		return
+	}
+
+	// since we did chdir in main this should be fine
+	usage, err := disk.Usage(".")
+	if err != nil {
+		log.Println(err)
+		msgHandler.SendResponse(false, err.Error())
+		msgHandler.Close()
+		return
+	}
+
+	log.Printf("Free space: %d\n", usage.Free)
+	log.Printf("File size: %d\n", request.Size)
+	if usage.Free <= request.Size {
+		log.Println(err)
+		msgHandler.SendResponse(false, "Server does not have enough disk space for file.")
 		msgHandler.Close()
 		return
 	}
