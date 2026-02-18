@@ -27,6 +27,8 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 	io.CopyN(w, msgHandler, int64(request.Size)) /* Write and checksum as we go */
 	file.Close()
 
+	log.Println("file closed")
+
 	serverCheck := md5.Sum(nil)
 
 	clientCheckMsg, _ := msgHandler.Receive()
@@ -34,8 +36,10 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 
 	if util.VerifyChecksum(serverCheck, clientCheck) {
 		log.Println("Successfully stored file.")
+		msgHandler.SendResponse(true, "Successfully stored file.")
 	} else {
 		log.Println("FAILED to store file. Invalid checksum.")
+		msgHandler.SendResponse(false, "FAILED to store file.")
 	}
 }
 
