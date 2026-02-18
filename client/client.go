@@ -18,14 +18,18 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 	// Get file size and make sure it exists
 	info, err := os.Stat(fileName)
 	if err != nil {
+		log.Println("error when getting file size")
 		log.Fatalln(err)
 	}
 
 	// Tell the server we want to store this file
+	log.Printf("Sending storage request for %s\n", fileName)
 	msgHandler.SendStorageRequest(fileName, uint64(info.Size()))
 	if ok, _ := msgHandler.ReceiveResponse(); !ok {
 		return 1
 	}
+
+	log.Println("Server OKd send request")
 
 	file, _ := os.Open(fileName)
 	md5 := md5.New()
@@ -33,9 +37,11 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 	io.CopyN(w, file, info.Size()) // Checksum and transfer file at same time
 	file.Close()
 
+	log.Println("file closed")
 	checksum := md5.Sum(nil)
 	msgHandler.SendChecksumVerification(checksum)
-	if ok, _ := msgHandler.ReceiveResponse(); !ok {
+	if ok, err := msgHandler.ReceiveResponse(); !ok {
+		log.Fatalln(err)
 		return 1
 	}
 
@@ -109,8 +115,10 @@ func main() {
 	openDir.Close()
 
 	if action == "put" {
+		log.Println("putting")
 		os.Exit(put(msgHandler, fileName))
 	} else if action == "get" {
+		log.Println("getting")
 		os.Exit(get(msgHandler, fileName))
 	}
 }

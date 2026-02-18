@@ -15,6 +15,7 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 	log.Println("Attempting to store", request.FileName)
 	file, err := os.OpenFile(request.FileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 	if err != nil {
+		log.Println(err)
 		msgHandler.SendResponse(false, err.Error())
 		msgHandler.Close()
 		return
@@ -102,6 +103,8 @@ func main() {
 	if len(os.Args) >= 3 {
 		dir = os.Args[2]
 	}
+
+	// Start up and make sure storage directory exists
 	if err := os.Chdir(dir); err != nil {
 		log.Fatalln(err)
 	}
@@ -109,9 +112,11 @@ func main() {
 	fmt.Println("Listening on port:", port)
 	fmt.Println("Download directory:", dir)
 	for {
+		// Listen on the specified port for incoming client connections
 		if conn, err := listener.Accept(); err == nil {
 			log.Println("Accepted connection", conn.RemoteAddr())
 			handler := messages.NewMessageHandler(conn)
+			// Handle each request with a separate goroutine (to allow multiple client connections)
 			go handleClient(handler)
 		}
 	}
