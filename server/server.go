@@ -2,10 +2,10 @@ package main
 
 import (
 	"crypto/md5"
-	"github.com/shirou/gopsutil/v4/disk"
 	"file-transfer/messages"
 	"file-transfer/util"
 	"fmt"
+	"github.com/shirou/gopsutil/v4/disk"
 	"io"
 	"log"
 	"net"
@@ -35,6 +35,7 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 
 	log.Printf("Free space: %d\n", usage.Free)
 	log.Printf("File size: %d\n", request.Size)
+	// SPEC: 2. Ensure there is enough space available on the disk
 	if usage.Free <= request.Size {
 		log.Println(err)
 		msgHandler.SendResponse(false, "Server does not have enough disk space for file.")
@@ -42,8 +43,10 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 		return
 	}
 
+	// SPEC: 3. Send an “OK” response to the client so it knows it can begin sending the file
 	msgHandler.SendResponse(true, "Ready for data")
 	md5 := md5.New()
+	// SPEC: 4. Receive data stream and store the file
 	w := io.MultiWriter(file, md5)
 	io.CopyN(w, msgHandler, int64(request.Size)) /* Write and checksum as we go */
 	file.Close()
@@ -52,10 +55,12 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 
 	serverCheck := md5.Sum(nil)
 
+	// SPEC: 5. Verify its checksum against the checksum sent by the client
 	clientCheckMsg, _ := msgHandler.Receive()
 	clientCheck := clientCheckMsg.GetChecksum().Checksum
 
 	// no delete on checksum failure??
+	// SPEC: 6. Respond to the client with the status of the transfer (success or failure)
 	if util.VerifyChecksum(serverCheck, clientCheck) {
 		log.Println("Successfully stored file.")
 		msgHandler.SendResponse(true, "Successfully stored file.")
@@ -63,6 +68,9 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 		log.Println("FAILED to store file. Invalid checksum.")
 		msgHandler.SendResponse(false, "FAILED to store file.")
 	}
+
+	// SPEC: 7. Disconnect the client
+	msgHandler.Close()
 }
 
 func handleRetrieval(msgHandler *messages.MessageHandler, request *messages.RetrievalRequest) {
@@ -100,8 +108,7 @@ func handleClient(msgHandler *messages.MessageHandler) {
 		switch msg := wrapper.Msg.(type) {
 		case *messages.Wrapper_StorageReq:
 			handleStorage(msgHandler, msg.StorageReq)
-			msgHandler.Close()
-			return
+			continue
 		case *messages.Wrapper_RetrievalReq:
 			handleRetrieval(msgHandler, msg.RetrievalReq)
 			msgHandler.Close()
