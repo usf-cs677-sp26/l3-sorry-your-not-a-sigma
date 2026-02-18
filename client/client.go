@@ -18,7 +18,7 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 	// Get file size and make sure it exists
 	info, err := os.Stat(fileName)
 	if err != nil {
-		log.Println("error when getting file size")
+		log.Println("error when getting file size:")
 		log.Fatalln(err)
 	}
 
@@ -32,6 +32,7 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 	log.Println("Server OKd send request")
 
 	file, _ := os.Open(fileName)
+	// md5 is a hash.Hash that has an embedded io.Writer
 	md5 := md5.New()
 	w := io.MultiWriter(msgHandler, md5)
 	io.CopyN(w, file, info.Size()) // Checksum and transfer file at same time

@@ -36,6 +36,7 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 	clientCheckMsg, _ := msgHandler.Receive()
 	clientCheck := clientCheckMsg.GetChecksum().Checksum
 
+	// no delete on checksum failure??
 	if util.VerifyChecksum(serverCheck, clientCheck) {
 		log.Println("Successfully stored file.")
 		msgHandler.SendResponse(true, "Successfully stored file.")
