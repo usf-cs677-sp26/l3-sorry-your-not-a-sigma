@@ -10,13 +10,17 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 )
 
 func handleStorage(msgHandler *messages.MessageHandler, request *messages.StorageRequest) {
-	log.Println("Attempting to store", request.FileName)
+	// this is required to flatten file hierarchy as Note 1 states there is no concept
+	// of directories
+	fileName := filepath.Base(request.FileName)
+	log.Println("Attempting to store", fileName)
 	// os.O_EXCL ensure no overwrite
 	// SPEC: 1. Make sure the file doesn’t already exist (refuse to overwrite existing files)
-	file, err := os.OpenFile(request.FileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
+	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Println(err)
 		msgHandler.SendResponse(false, err.Error())
