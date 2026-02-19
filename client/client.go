@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -55,6 +56,7 @@ func get(msgHandler *messages.MessageHandler, fileName string) int {
 
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 	if err != nil {
+		log.Printf("file: %s\n", fileName)
 		log.Println(err)
 		return 1
 	}
@@ -120,6 +122,6 @@ func main() {
 		os.Exit(put(msgHandler, fileName))
 	} else if action == "get" {
 		log.Println("getting")
-		os.Exit(get(msgHandler, fileName))
+		os.Exit(get(msgHandler, filepath.Join(dir, fileName)))
 	}
 }
