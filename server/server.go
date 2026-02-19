@@ -9,10 +9,13 @@ import (
 	"log"
 	"net"
 	"os"
+
+	"github.com/shirou/gopsutil/v4/disk"
 )
 
 func handleStorage(msgHandler *messages.MessageHandler, request *messages.StorageRequest) {
 	log.Println("Attempting to store", request.FileName)
+	// Make sure the file doesn’t already exist (refuse to overwrite existing files)
 	file, err := os.OpenFile(request.FileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 	if err != nil {
 		msgHandler.SendResponse(false, err.Error())
@@ -20,7 +23,31 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 		return
 	}
 
+	// Ensure there is enough space available on the disk
+	// Using disk from https://github.com/shirou/gopsutil/blob/v3.21.11/disk/disk.go#L12
+	usage, err := disk.Usage(".")
+	if err != nil {
+		msgHandler.SendResponse(false, err.Error())
+		msgHandler.Close()
+		return
+	}
+
+	msgSize := request.GetSize()
+	usageSize := usage.Free
+	if msgSize > usageSize {
+		errMsg := fmt.Sprintf(
+			"No disk space. Message size: %d, Available space: %d, Exceeds by: %d",
+			msgSize, usageSize, msgSize-usageSize,
+		)
+		msgHandler.SendResponse(false, errMsg)
+		msgHandler.Close()
+		return
+	}
+
+	// Send an “OK” response to the client so it knows it can begin sending the file
 	msgHandler.SendResponse(true, "Ready for data")
+
+	// Receive data stream and store the file
 	md5 := md5.New()
 	w := io.MultiWriter(file, md5)
 	io.CopyN(w, msgHandler, int64(request.Size)) /* Write and checksum as we go */
@@ -28,27 +55,37 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 
 	serverCheck := md5.Sum(nil)
 
+	// Verify its checksum against the checksum sent by the client
 	clientCheckMsg, _ := msgHandler.Receive()
 	clientCheck := clientCheckMsg.GetChecksum().Checksum
 
+	// Respond to the client with the status of the transfer (success or failure)
 	if util.VerifyChecksum(serverCheck, clientCheck) {
 		log.Println("Successfully stored file.")
+		msgHandler.SendResponse(true, "File transfer completed and verified")
 	} else {
 		log.Println("FAILED to store file. Invalid checksum.")
+		msgHandler.SendResponse(false, "Checksum mismatch")
 	}
+
+	// Disconnect the client
+	msgHandler.Close()
 }
 
 func handleRetrieval(msgHandler *messages.MessageHandler, request *messages.RetrievalRequest) {
 	log.Println("Attempting to retrieve", request.FileName)
 
+	// Ensure the file requested actually exists
 	// Get file size and make sure it exists
 	info, err := os.Stat(request.FileName)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
+	// Send a response back to the client with the file’s size and checksum (or indicate failure if it doesn’t exit)
 	msgHandler.SendRetrievalResponse(true, "Ready to send", uint64(info.Size()))
 
+	// Begin streaming file to the client
 	file, _ := os.Open(request.FileName)
 	md5 := md5.New()
 	w := io.MultiWriter(msgHandler, md5)
@@ -57,6 +94,9 @@ func handleRetrieval(msgHandler *messages.MessageHandler, request *messages.Retr
 
 	checksum := md5.Sum(nil)
 	msgHandler.SendChecksumVerification(checksum)
+
+	// Disconnect the client when the transfer is complete
+	msgHandler.Close()
 }
 
 func handleClient(msgHandler *messages.MessageHandler) {
