@@ -21,6 +21,7 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 		log.Fatalln(err)
 	}
 
+	// Wait for the server’s response to the storage request. If it accepts, begin sending the data
 	// Tell the server we want to store this file
 	msgHandler.SendStorageRequest(fileName, uint64(info.Size()))
 	if ok, _ := msgHandler.ReceiveResponse(); !ok {
@@ -35,23 +36,29 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 
 	checksum := md5.Sum(nil)
 	msgHandler.SendChecksumVerification(checksum)
+
+	// After the transfer is complete, wait for acknowledgement by the server
 	if ok, _ := msgHandler.ReceiveResponse(); !ok {
 		return 1
 	}
 
 	fmt.Println("Storage complete!")
+
+	// The server will terminate the connection. The client exits
 	return 0
 }
 
 func get(msgHandler *messages.MessageHandler, fileName string) int {
 	fmt.Println("GET", fileName)
 
+	// Create the file and begin storing its data
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Println(err)
 		return 1
 	}
 
+	// Wait for the server’s response to the retrieval request.
 	msgHandler.SendRetrievalRequest(fileName)
 	ok, _, size := msgHandler.ReceiveRetrievalResponse()
 	if !ok {
@@ -63,14 +70,17 @@ func get(msgHandler *messages.MessageHandler, fileName string) int {
 	io.CopyN(w, msgHandler, int64(size))
 	file.Close()
 
+	// After the transfer is complete (the server will disconnect), verify the checksum of the file and report success/failure.
 	clientCheck := md5.Sum(nil)
 	checkMsg, _ := msgHandler.Receive()
 	serverCheck := checkMsg.GetChecksum().Checksum
 
 	if util.VerifyChecksum(serverCheck, clientCheck) {
 		log.Println("Successfully retrieved file.")
+		msgHandler.SendResponse(true, "Successfully retrieved file.")
 	} else {
 		log.Println("FAILED to retrieve file. Invalid checksum.")
+		msgHandler.SendResponse(false, "FAILED to retrieve file. Invalid checksum.")
 	}
 
 	return 0
@@ -82,6 +92,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Start up and connect to the server
 	host := os.Args[1]
 	conn, err := net.Dial("tcp", host)
 	if err != nil {
