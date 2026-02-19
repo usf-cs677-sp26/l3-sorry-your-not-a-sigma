@@ -16,3 +16,5 @@ func VerifyChecksum(serverCheck []byte, clientCheck []byte) bool {
 		return false
 	}
 }
+
+

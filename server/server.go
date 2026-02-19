@@ -117,6 +117,7 @@ func handleClient(msgHandler *messages.MessageHandler) {
 			continue
 		case nil:
 			log.Println("Received an empty message, terminating client")
+			msgHandler.Close()
 			return
 		default:
 			log.Printf("Unexpected message type: %T", msg)
