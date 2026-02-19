@@ -24,7 +24,6 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 	if err != nil {
 		log.Println(err)
 		msgHandler.SendResponse(false, err.Error())
-		msgHandler.Close()
 		return
 	}
 
@@ -33,7 +32,6 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 	if err != nil {
 		log.Println(err)
 		msgHandler.SendResponse(false, err.Error())
-		msgHandler.Close()
 		return
 	}
 
@@ -43,7 +41,6 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 	if usage.Free <= request.Size {
 		log.Println(err)
 		msgHandler.SendResponse(false, "Server does not have enough disk space for file.")
-		msgHandler.Close()
 		return
 	}
 
@@ -72,9 +69,6 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 		log.Println("FAILED to store file. Invalid checksum.")
 		msgHandler.SendResponse(false, "FAILED to store file.")
 	}
-
-	// SPEC: 7. Disconnect the client
-	msgHandler.Close()
 }
 
 func handleRetrieval(msgHandler *messages.MessageHandler, request *messages.RetrievalRequest) {
@@ -99,6 +93,7 @@ func handleRetrieval(msgHandler *messages.MessageHandler, request *messages.Retr
 }
 
 func handleClient(msgHandler *messages.MessageHandler) {
+	// SPEC: 7. Disconnect the client
 	defer msgHandler.Close()
 
 	for {
@@ -112,10 +107,9 @@ func handleClient(msgHandler *messages.MessageHandler) {
 		switch msg := wrapper.Msg.(type) {
 		case *messages.Wrapper_StorageReq:
 			handleStorage(msgHandler, msg.StorageReq)
-			continue
+			return
 		case *messages.Wrapper_RetrievalReq:
 			handleRetrieval(msgHandler, msg.RetrievalReq)
-			msgHandler.Close()
 			return
 		case nil:
 			log.Println("Received an empty message, terminating client")
