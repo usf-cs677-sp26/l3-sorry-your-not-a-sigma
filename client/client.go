@@ -9,7 +9,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -19,7 +18,7 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 	// Get file size and make sure it exists
 	info, err := os.Stat(fileName)
 	if err != nil {
-		log.Println("error when getting file size:")
+		log.Println("error when getting file size")
 		log.Fatalln(err)
 	}
 
@@ -33,7 +32,6 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 	log.Println("Server OKd send request")
 
 	file, _ := os.Open(fileName)
-	// md5 is a hash.Hash that has an embedded io.Writer
 	md5 := md5.New()
 	w := io.MultiWriter(msgHandler, md5)
 	io.CopyN(w, file, info.Size()) // Checksum and transfer file at same time
@@ -42,8 +40,7 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 	log.Println("file closed")
 	checksum := md5.Sum(nil)
 	msgHandler.SendChecksumVerification(checksum)
-	if ok, err := msgHandler.ReceiveResponse(); !ok {
-		log.Fatalln(err)
+	if ok, _ := msgHandler.ReceiveResponse(); !ok {
 		return 1
 	}
 
@@ -56,12 +53,14 @@ func get(msgHandler *messages.MessageHandler, fileName string) int {
 
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 	if err != nil {
+		log.Println(err)
 		return 1
 	}
 
 	msgHandler.SendRetrievalRequest(fileName)
 	ok, _, size := msgHandler.ReceiveRetrievalResponse()
 	if !ok {
+		os.Remove(fileName)
 		return 1
 	}
 
@@ -77,6 +76,7 @@ func get(msgHandler *messages.MessageHandler, fileName string) int {
 	if util.VerifyChecksum(serverCheck, clientCheck) {
 		log.Println("Successfully retrieved file.")
 	} else {
+		os.Remove(fileName)
 		log.Println("FAILED to retrieve file. Invalid checksum.")
 	}
 
@@ -120,6 +120,6 @@ func main() {
 		os.Exit(put(msgHandler, fileName))
 	} else if action == "get" {
 		log.Println("getting")
-		os.Exit(get(msgHandler, filepath.Join(dir, fileName)))
+		os.Exit(get(msgHandler, fileName))
 	}
 }

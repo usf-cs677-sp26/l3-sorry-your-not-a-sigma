@@ -67,6 +67,7 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 		msgHandler.SendResponse(true, "Successfully stored file.")
 	} else {
 		log.Println("FAILED to store file. Invalid checksum.")
+		os.Remove(fileName)
 		msgHandler.SendResponse(false, "FAILED to store file.")
 	}
 }
