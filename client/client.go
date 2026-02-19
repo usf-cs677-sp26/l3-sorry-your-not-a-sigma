@@ -56,8 +56,6 @@ func get(msgHandler *messages.MessageHandler, fileName string) int {
 
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 	if err != nil {
-		log.Printf("file: %s\n", fileName)
-		log.Println(err)
 		return 1
 	}
 

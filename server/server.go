@@ -77,7 +77,9 @@ func handleRetrieval(msgHandler *messages.MessageHandler, request *messages.Retr
 	// Get file size and make sure it exists
 	info, err := os.Stat(request.FileName)
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
+		msgHandler.SendRetrievalResponse(false, err.Error(), 0)
+		return
 	}
 
 	msgHandler.SendRetrievalResponse(true, "Ready to send", uint64(info.Size()))
